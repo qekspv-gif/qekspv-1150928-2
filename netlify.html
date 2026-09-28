@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netlify 發佈指南儀表板</title>
+    <!-- 引入 Tailwind CSS 以進行快速樣式設定 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts: Inter 字體 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 引入 FontAwesome 圖標 (Free 6.5.1) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        netlify: {
+                            light: '#E6F8F3',
+                            DEFAULT: '#00C7B7', // Netlify 標誌性青綠色
+                            dark: '#009689',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f3f4f6;
+        }
+        
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step-card {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        /* 順序發動動畫 */
+        .step-card:nth-child(1) { animation-delay: 0.05s; }
+        .step-card:nth-child(2) { animation-delay: 0.15s; }
+        .step-card:nth-child(3) { animation-delay: 0.25s; }
+        .step-card:nth-child(4) { animation-delay: 0.35s; }
+
+        .progress-bar-fill {
+            transition: width 0.4s ease-in-out;
+        }
+    </style>
+</head>
+<body class="font-sans text-gray-800 antialiased min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+
+    <!-- 側邊欄 (Sidebar) -->
+    <aside id="sidebar" class="w-full md:w-64 bg-white border-r border-gray-200 shadow-sm z-20 flex-shrink-0 flex flex-col h-auto md:h-screen transition-all duration-300">
+        <!-- 頂部 Logo 區塊 -->
+        <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200 flex-shrink-0">
+            <div class="flex items-center gap-2 text-xl font-bold text-gray-900">
+                <i class="fa-solid fa-cloud-arrow-up text-netlify"></i>
+                <span>部署中心</span>
+            </div>
+            <!-- 行動端選單切換按鈕 -->
+            <button id="mobileMenuBtn" class="md:hidden text-gray-500 hover:text-gray-700 focus:outline-none" onclick="toggleMobileMenu()">
+                <i class="fa-solid fa-bars text-xl" id="menuIcon"></i>
+            </button>
+        </div>
+
+        <!-- 導航選單區塊 -->
+        <div id="navContainer" class="hidden md:flex flex-col flex-1 overflow-y-auto">
+            <nav class="p-4 space-y-1">
+                <a href="#guide" class="flex items-center gap-3 px-3 py-2 bg-netlify-light text-netlify-dark rounded-lg font-medium transition-colors">
+                    <i class="fa-solid fa-list-check w-5 text-center"></i>
+                    Netlify 發佈指南
+                </a>
+                <a href="#overview" onclick="showToast('目前位於 Netlify 部署指南')" class="flex items-center gap-3 px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg font-medium transition-colors">
+                    <i class="fa-solid fa-desktop w-5 text-center"></i>
+                    專案總覽
+                </a>
+                <a href="#settings" onclick="showToast('請參考步驟 4 設定自訂網址')" class="flex items-center gap-3 px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg font-medium transition-colors">
+                    <i class="fa-solid fa-gear w-5 text-center"></i>
+                    部署設定
+                </a>
+                <a href="https://docs.netlify.com" target="_blank" class="flex items-center gap-3 px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg font-medium transition-colors">
+                    <i class="fa-regular fa-circle-question w-5 text-center"></i>
+                    官方說明文件
+                </a>
+            </nav>
+
+            <div class="p-4 mx-4 my-2 bg-gray-50 rounded-xl border border-gray-200">
+                <div class="flex items-center justify-between text-xs font-semibold text-gray-600 mb-2">
+                    <span>完成進度</span>
+                    <span id="progressPercentText">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                    <div id="sidebarProgressBar" class="bg-netlify h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <!-- 底部使用者資訊 -->
+            <div class="p-4 border-t border-gray-200 bg-white mt-auto flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-netlify text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                        U
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900">Netlify User</p>
+                        <p class="text-xs text-gray-500">Free Starter Plan</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主內容區 (Main Content) -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <!-- 頂部導航列 (Top Navbar) -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 lg:px-8 shadow-sm flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <h1 class="text-xl font-bold text-gray-800">網頁發佈指南儀表板</h1>
+                <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">即時教學</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="resetProgress()" class="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors hidden sm:inline-block">
+                    <i class="fa-solid fa-rotate-left mr-1"></i>重置進度
+                </button>
+                <a href="https://app.netlify.com" target="_blank" class="px-4 py-2 bg-netlify hover:bg-netlify-dark text-white rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-external-link-alt"></i> 前往 Netlify 官網
+                </a>
+            </div>
+        </header>
+
+        <!-- 儀表板內容區塊 -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-scrollbar bg-gray-50">
+            
+            <!-- 標題與簡介區塊 -->
+            <div class="max-w-5xl mx-auto mb-8">
+                <div class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-200 relative overflow-hidden">
+                    <!-- 背景亮色與圖示裝飾 -->
+                    <div class="absolute -top-6 -right-6 w-36 h-36 bg-netlify-light rounded-full opacity-60 pointer-events-none"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                            <div>
+                                <h2 class="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2">
+                                    使用 Netlify 發布靜態網頁
+                                </h2>
+                                <p class="text-gray-600 text-sm md:text-base max-w-2xl">
+                                    按照下方 4 個步驟輕鬆完成部署。您可以點擊各步驟卡片上的勾選框來紀錄您的發佈進度！
+                                </p>
+                            </div>
+                            <div class="bg-netlify-light/80 p-3 rounded-xl border border-netlify/20 flex items-center gap-3 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-full bg-netlify text-white flex items-center justify-center font-bold text-lg">
+                                    <span id="stepCounterText">0</span>/4
+                                </div>
+                                <div class="text-xs">
+                                    <p class="font-bold text-netlify-dark">部署步驟完成度</p>
+                                    <p class="text-gray-600" id="stepStatusSubtitle">請開始執行第一個步驟</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 進度指示線 -->
+                        <div class="mt-8 relative pt-2">
+                            <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
+                                <div id="mainProgressBar" style="width: 0%" class="progress-bar-fill shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-netlify"></div>
+                            </div>
+                            <div class="grid grid-cols-4 text-center text-xs font-semibold text-gray-600">
+                                <div id="stepDot1" class="transition-colors duration-300">1. 登入專案</div>
+                                <div id="stepDot2" class="transition-colors duration-300">2. 新增專案</div>
+                                <div id="stepDot3" class="transition-colors duration-300">3. 上傳檔案</div>
+                                <div id="stepDot4" class="transition-colors duration-300">4. 自訂網址</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步驟卡片列表 (Grid 佈局) -->
+            <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
+                
+                <!-- 步驟 1 卡片 -->
+                <div id="card-1" class="step-card bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all group relative flex flex-col">
+                    <div class="h-2 w-full bg-netlify"></div>
+                    <div class="p-6 flex-1 flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="px-3 py-1 bg-netlify-light text-netlify-dark rounded-full text-xs font-bold tracking-wide">
+                                步驟 1
+                            </span>
+                            <button onclick="toggleStep(1)" class="flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors" id="btn-step-1">
+                                <i class="fa-regular fa-circle-check text-base text-gray-400" id="icon-step-1"></i>
+                                <span id="label-step-1">標記為完成</span>
+                            </button>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-right-to-bracket text-netlify"></i>
+                            登入 Netlify 並進入專案頁面
+                        </h3>
+                        <p class="text-gray-600 text-sm mb-4">
+                            確保您已經登入 Netlify 帳號，並從主主控台進入專案管理分頁。
+                        </p>
+                        <div class="mt-auto bg-gray-50 rounded-xl p-4 border border-gray-100">
+                            <p class="text-xs font-semibold text-gray-500 mb-2">操作指引：</p>
+                            <ul class="space-y-2 text-sm text-gray-700">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span>前往 Netlify 主畫面，查看畫面左上角。</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span>點擊 <strong class="bg-gray-200 px-1.5 py-0.5 rounded text-gray-800">Projects</strong> (專案) 選項以進入專案總覽。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步驟 2 卡片 -->
+                <div id="card-2" class="step-card bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all group relative flex flex-col">
+                    <div class="h-2 w-full bg-netlify"></div>
+                    <div class="p-6 flex-1 flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="px-3 py-1 bg-netlify-light text-netlify-dark rounded-full text-xs font-bold tracking-wide">
+                                步驟 2
+                            </span>
+                            <button onclick="toggleStep(2)" class="flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors" id="btn-step-2">
+                                <i class="fa-regular fa-circle-check text-base text-gray-400" id="icon-step-2"></i>
+                                <span id="label-step-2">標記為完成</span>
+                            </button>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-plus-circle text-netlify"></i>
+                            建立新專案
+                        </h3>
+                        <p class="text-gray-600 text-sm mb-3">
+                            在 Dashboard 或 Projects 頁面準備一個新的發佈空間。
+                        </p>
+                        <div class="bg-blue-50 border-l-4 border-blue-400 p-2.5 mb-4 rounded-r-lg text-xs text-blue-800">
+                            <i class="fa-solid fa-circle-info mr-1"></i> <strong>提示：</strong> 初次使用 Netlify 的全新帳號可能會自動跳過此步驟。
+                        </div>
+                        <div class="mt-auto bg-gray-50 rounded-xl p-4 border border-gray-100">
+                            <p class="text-xs font-semibold text-gray-500 mb-2">操作指引：</p>
+                            <ul class="space-y-2 text-sm text-gray-700">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span>在 Dashboard 或 Projects 頁面右上角。</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span>點擊青綠色的 <strong class="bg-netlify/20 text-netlify-dark px-1.5 py-0.5 rounded">Add new project</strong> (新增項目) 按鈕。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步驟 3 卡片 (跨兩欄) -->
+                <div id="card-3" class="step-card bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all group md:col-span-2">
+                    <div class="h-2 w-full bg-netlify"></div>
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="px-3 py-1 bg-netlify-light text-netlify-dark rounded-full text-xs font-bold tracking-wide">
+                                步驟 3 (關鍵步驟)
+                            </span>
+                            <button onclick="toggleStep(3)" class="flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors" id="btn-step-3">
+                                <i class="fa-regular fa-circle-check text-base text-gray-400" id="icon-step-3"></i>
+                                <span id="label-step-3">標記為完成</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- 左側說明 -->
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                    <i class="fa-solid fa-file-arrow-up text-netlify"></i>
+                                    拖曳資料夾上傳
+                                </h3>
+                                <p class="text-gray-600 text-sm mb-4">
+                                    將您在電腦上的網頁資料夾或 HTML 檔案直接上傳部署到伺服器。
+                                </p>
+                                <ul class="space-y-3 text-sm text-gray-700 mb-4">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0 text-xs"></i>
+                                        <span>找到畫面中央第 3 個區塊 <strong>(Upload your project files)</strong>。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0 text-xs"></i>
+                                        <span>看到大矩形虛線框，標示：<br>
+                                            <span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 mt-1 inline-block font-mono">
+                                                "Drop a project folder, zip file, or HTML file to deploy instantly."
+                                            </span>
+                                        </span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0 text-xs"></i>
+                                        <span>可直接<strong>拖曳資料夾</strong>，或點選 <span class="underline font-medium">browse files to upload</span> / <span class="underline font-medium">choose a folder</span>。</span>
+                                    </li>
+                                </ul>
+
+                                <div class="bg-amber-50 border-l-4 border-amber-400 p-3 rounded-r-lg text-xs text-amber-800">
+                                    <p class="font-bold mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 重要提醒：</p>
+                                    <p>若系統詢問 <strong>「Rename to index.html?」</strong>，請務必點選 <strong class="underline">「Rename and deploy」</strong>，網站首頁才能被伺服器正確辨識！</p>
+                                </div>
+                            </div>
+
+                            <!-- 右側虛擬上傳視覺效果 -->
+                            <div class="border-2 border-dashed border-gray-300 rounded-2xl bg-gray-50 flex flex-col items-center justify-center p-6 text-center hover:border-netlify hover:bg-netlify-light/20 transition-all">
+                                <div class="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-netlify mb-3">
+                                    <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+                                </div>
+                                <p class="text-sm font-bold text-gray-800 mb-1">將專案資料夾拖曳至此處</p>
+                                <p class="text-xs text-gray-500 mb-4">支援 Folder、ZIP 或 HTML 檔案</p>
+                                <div class="flex gap-2">
+                                    <button class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+                                        browse files
+                                    </button>
+                                    <button class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+                                        choose a folder
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步驟 4 卡片 (跨兩欄) -->
+                <div id="card-4" class="step-card bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all group md:col-span-2">
+                    <div class="h-2 w-full bg-netlify"></div>
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="px-3 py-1 bg-netlify-light text-netlify-dark rounded-full text-xs font-bold tracking-wide">
+                                步驟 4
+                            </span>
+                            <button onclick="toggleStep(4)" class="flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors" id="btn-step-4">
+                                <i class="fa-regular fa-circle-check text-base text-gray-400" id="icon-step-4"></i>
+                                <span id="label-step-4">標記為完成</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- 左側說明 -->
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                    <i class="fa-solid fa-globe text-netlify"></i>
+                                    建立公開網址名稱與完成發布
+                                </h3>
+                                <p class="text-gray-600 text-sm mb-4">
+                                    部署完成後，Netlify 會生成隨機網址。您可以自訂為好記的專屬名稱。
+                                </p>
+                                
+                                <ul class="space-y-2.5 text-sm text-gray-700 mb-4">
+                                    <li class="flex items-start gap-2">
+                                        <span class="w-5 h-5 rounded-full bg-gray-200 text-gray-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">A</span>
+                                        <span>點選 <strong>「Make public」</strong> 或點選 <strong>「編輯 (鉛筆圖示)」</strong>。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="w-5 h-5 rounded-full bg-gray-200 text-gray-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">B</span>
+                                        <span>
+                                            輸入自訂網址名稱。
+                                            <span class="block text-xs text-rose-500 mt-1">
+                                                <i class="fa-solid fa-circle-exclamation mr-1"></i>規範：只能包含英文小寫數字與連字號 (-)
+                                            </span>
+                                        </span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="w-5 h-5 rounded-full bg-gray-200 text-gray-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">C</span>
+                                        <span>按下 <strong>✅ (確認)</strong> 或點擊 <strong> Make public</strong> 保存變更。</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- 右側即時測試與成功卡片 -->
+                            <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 border border-emerald-200 flex flex-col justify-between">
+                                <div>
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <i class="fa-solid fa-circle-check text-emerald-600 text-xl"></i>
+                                        <h4 class="font-bold text-emerald-900">大功告成！網站發布測試</h4>
+                                    </div>
+                                    <p class="text-xs text-emerald-700 mb-4">您可以嘗試在下方輸入框測試您的自訂網址名稱：</p>
+                                    
+                                    <!-- 自訂網址輸入區 -->
+                                    <div class="mb-3">
+                                        <label class="block text-xs font-semibold text-gray-600 mb-1">網址前綴：</label>
+                                        <div class="flex items-center bg-white border border-emerald-300 rounded-lg overflow-hidden shadow-sm">
+                                            <input type="text" id="customSubdomain" value="my-awesome-site" oninput="updateSiteUrl()" class="px-3 py-2 text-sm text-gray-800 w-full focus:outline-none font-mono">
+                                            <span class="text-xs text-gray-400 bg-gray-100 px-3 py-2.5 border-l border-emerald-200 font-mono">.netlify.app</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm flex items-center justify-between gap-2 mt-2">
+                                    <div class="truncate text-xs font-mono text-emerald-800" id="fullUrlPreview">
+                                        https://my-awesome-site.netlify.app
+                                    </div>
+                                    <button onclick="copyUrl()" class="px-3 py-1.5 bg-netlify hover:bg-netlify-dark text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 flex-shrink-0">
+                                        <i class="fa-regular fa-copy"></i>
+                                        <span>複製</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- 頁尾區塊 -->
+            <footer class="max-w-5xl mx-auto border-t border-gray-200 pt-6 pb-8 text-center text-xs text-gray-500">
+                <p>Netlify 靜態網頁發佈指南儀表板 &copy; 2026</p>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Toast 通知 -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 z-50 text-sm">
+        <i class="fa-solid fa-circle-info text-netlify"></i>
+        <span id="toastMsg">提示訊息</span>
+    </div>
+
+    <script>
+        // 記錄步驟狀態
+        const stepState = {
+            1: false,
+            2: false,
+            3: false,
+            4: false
+        };
+
+        // 切換側邊欄 (Mobile)
+        function toggleMobileMenu() {
+            const nav = document.getElementById('navContainer');
+            nav.classList.toggle('hidden');
+        }
+
+        // 切換步驟完成狀態
+        function toggleStep(stepNum) {
+            stepState[stepNum] = !stepState[stepNum];
+            updateUI();
+        }
+
+        // 重置進度
+        function resetProgress() {
+            for (let i = 1; i <= 4; i++) {
+                stepState[i] = false;
+            }
+            updateUI();
+            showToast('已重置進度！');
+        }
+
+        // 更新 UI 狀態
+        function updateUI() {
+            let completedCount = 0;
+
+            for (let i = 1; i <= 4; i++) {
+                const btn = document.getElementById(`btn-step-${i}`);
+                const icon = document.getElementById(`icon-step-${i}`);
+                const label = document.getElementById(`label-step-${i}`);
+                const card = document.getElementById(`card-${i}`);
+                const dot = document.getElementById(`stepDot${i}`);
+
+                if (stepState[i]) {
+                    completedCount++;
+                    // 按鈕樣式
+                    btn.className = "flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-lg border bg-emerald-50 text-emerald-700 border-emerald-300";
+                    icon.className = "fa-solid fa-circle-check text-base text-emerald-600";
+                    label.innerText = "已完成";
+                    card.classList.add("ring-2", "ring-netlify/40");
+                    dot.className = "transition-colors duration-300 font-bold text-netlify";
+                } else {
+                    btn.className = "flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50";
+                    icon.className = "fa-regular fa-circle-check text-base text-gray-400";
+                    label.innerText = "標記為完成";
+                    card.classList.remove("ring-2", "ring-netlify/40");
+                    dot.className = "transition-colors duration-300 text-gray-500 font-semibold";
+                }
+            }
+
+            // 更新數字與進度條
+            const percent = Math.round((completedCount / 4) * 100);
+            document.getElementById('stepCounterText').innerText = completedCount;
+            document.getElementById('progressPercentText').innerText = percent + '%';
+            document.getElementById('mainProgressBar').style.width = percent + '%';
+            document.getElementById('sidebarProgressBar').style.width = percent + '%';
+
+            // 更新副標題說明
+            const statusSubtitle = document.getElementById('stepStatusSubtitle');
+            if (completedCount === 0) statusSubtitle.innerText = "請開始執行第一個步驟";
+            else if (completedCount === 4) statusSubtitle.innerText = "🎉 太棒了！您已成功發布網站！";
+            else statusSubtitle.innerText = `已完成 ${completedCount} 個步驟，加油！`;
+        }
+
+        // 動態更新網址預覽
+        function updateSiteUrl() {
+            let val = document.getElementById('customSubdomain').value.toLowerCase();
+            // 只保留英文字母、數字與連字號
+            val = val.replace(/[^a-z0-9-]/g, '');
+            document.getElementById('customSubdomain').value = val;
+            const fullUrl = `https://${val || 'your-site'}.netlify.app`;
+            document.getElementById('fullUrlPreview').innerText = fullUrl;
+        }
+
+        // 複製網址功能
+        function copyUrl() {
+            const urlText = document.getElementById('fullUrlPreview').innerText;
+            
+            // 使用剪貼簿備用方案
+            const tempInput = document.createElement('input');
+            tempInput.value = urlText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            try {
+                document.execCommand('copy');
+                showToast(`已複製網址：${urlText}`);
+            } catch (err) {
+                showToast('複製失敗，請手動複製網址');
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        // 顯示 Toast 通知的函式
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            toastMsg.innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
